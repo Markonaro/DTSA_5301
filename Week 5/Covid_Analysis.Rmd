@@ -1,0 +1,27 @@
+---
+title: "Week 5 Covid"
+output: html_document
+date: "2023-10-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r import, echo=FALSE}
+# install.packages(tidyverse)
+# install.packages(lubridate)
+# library(tidyverse)
+# library(lubridate)
+
+root = "https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_time_series/"
+
+US_Confirmed = drop_na(read_csv(paste(root, "time_series_covid19_confirmed_US.csv", sep="")))
+Global_Confirmed = drop_na(read_csv(paste(root, "time_series_covid19_confirmed_global.csv", sep="")))
+US_Death = drop_na(read_csv(paste(root, "time_series_covid19_deaths_US.csv", sep="")))
+Global_Dealth = drop_na(read_csv(paste(root, "time_series_covid19_deaths_global.csv", sep="")))
+```
+
+``` {r tidy}
+
+```
