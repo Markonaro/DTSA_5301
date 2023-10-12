@@ -1,0 +1,111 @@
+---
+title: "Week 5 - Covid-19 Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+We will begin by importing data from Johns Hopkins pertaining to Covid-19 deaths and cases from across the US, between 2020 and 2023:
+
+```{r import, echo=FALSE, results=FALSE}
+# install.packages(tidyverse)
+# install.packages(lubridate)
+library(tidyverse)
+library(lubridate)
+
+root <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/"
+
+US_Cases = read_csv(str_c(root, "time_series_covid19_confirmed_US.csv"))
+# Global_Cases = read_csv(str_c(root, "time_series_covid19_confirmed_global.csv"))
+US_Deaths = read_csv(str_c(root, "time_series_covid19_deaths_US.csv"))
+# Global_Deaths = read_csv(str_c(root, "time_series_covid19_deaths_global.csv"))
+```
+
+We will now focus on the data of interest:
+
+``` {r tidy, echo = FALSE}
+US_Cases <- US_Cases %>%
+  select(-c(UID, iso2, iso3, code3, FIPS, Country_Region, Lat, Long_, Combined_Key)) %>%
+  rename(County = "Admin2",
+         State = "Province_State")
+
+US_Deaths <- US_Deaths %>%
+  select(-c(UID, iso2, iso3, code3, FIPS, Country_Region, Combined_Key, Lat, Long_, Population)) %>%
+  rename(County = "Admin2",
+         State = "Province_State")
+```
+
+From the NYPD analysis we did earlier in this class, Brooklyn was the borough with the most shootings. Let's see how Covid case and death rates trended in this borough:
+
+```{r Brooklyn, echo = FALSE}
+Brooklyn_Deaths <- US_Deaths %>%
+  filter(State == "New York",
+         County == "Kings") %>%
+  pivot_longer(cols=3:ncol(US_Deaths),
+               names_to="Date",
+               values_to="Deaths") %>%
+  mutate(Death_Rate = c(0, diff(Deaths))) %>%
+  select(-c(County, State))
+
+Brooklyn_Deaths$Date <- mdy(Brooklyn_Deaths$Date)
+
+Brooklyn_Deaths <- Brooklyn_Deaths %>%
+  filter(day(Date) == 1 | 
+         as.integer(day(Date)) %% 2 == 0,
+         Death_Rate >= 0,
+         Date != '2020-05-18') # an anomalous reporting on 5/18/2020 of > 1,500 cases is to be disregarded moving forward.
+
+Brooklyn_Cases <- US_Cases %>%
+  filter(State == "New York",
+         County == "Kings") %>%
+  pivot_longer(cols=3:ncol(US_Cases),
+               names_to="Date",
+               values_to="Cases") %>%
+  mutate(Case_Rate = c(0, diff(Cases))) %>%
+  select(-c(County, State))
+
+Brooklyn_Cases$Date <- mdy(Brooklyn_Cases$Date)
+
+Brooklyn_Cases <- Brooklyn_Cases %>%
+  filter(day(Date) == 1 | 
+         as.integer(day(Date)) %% 2 == 0,
+         Case_Rate >= 0,
+         Date != '2020-05-18')
+```
+
+
+```{r Brooklyn_graph, echo = FALSE}
+Brooklyn_Cases %>%
+  ggplot(aes(x = Date, y = Case_Rate, group = 1)) +
+  ggtitle("Covid-19 Case Rates in Brooklyn") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_line(data = Brooklyn_Cases)
+
+Brooklyn_Deaths %>%
+  ggplot(aes(x = Date, y = Death_Rate, group = 1)) +
+  ggtitle("Covid-19 Death Rates in Brooklyn") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_line(data = Brooklyn_Deaths)
+```
+
+*Note: Preliminary analysis of the data discovered some negative values for rates of deaths. Unless people are coming back to life or being posthumously recategorized as not a Covid-19 death, the given days are discarded for this analysis. Further clarification would be needed from the source as to why this is occuring in the data.*
+
+We see spikes in cases each year in the months of ~November through March. The spikes in deaths seems to slightly lag the spikes in cases. We can also observe a much tighter correlation between cases and deaths in 2020 and 2021 while the correlation between cases in 2022 and 2023 is much less pronounced. To model this, we can look at the number of cases per deaths over time:
+
+```{r DPC, echo = FALSE}
+Deaths_per_Case <- right_join(Brooklyn_Cases, Brooklyn_Deaths) %>%
+  mutate(Deaths_per_Case_x_1000 = as.integer(1000*Deaths/Cases)) %>%
+  filter(!is.na(Deaths_per_Case_x_1000))
+
+Deaths_per_Case %>%
+  ggplot(aes(x = Date, y = Deaths_per_Case_x_1000, group = 1)) +
+  ggtitle("Covid-19 Cases per Death in Brooklyn") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_line(data = Deaths_per_Case)
+```
+
+We can observe here that as the population was initially exposed to the novel virus in early 2020, it quickly began taking lives. However, once a significant portion of the population was exposed to the virus, the deaths per case began to steadily decrease. This model trend in conjunction with the above two visualizations would lead one to conclude the virus was generally becoming more virulent and less fatal over time.
+
+Some sources of bias in the data could be either over or under reporting of cases and/or deaths. The data could also contain instances of simply death *with* Covid-19 rather than truly deaths *from* Covid-19. 
